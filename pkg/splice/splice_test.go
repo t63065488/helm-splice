@@ -31,10 +31,10 @@ func unmarshalYAML(t *testing.T, data []byte) interface{} {
 	return v
 }
 
-func TestBasicSplice(t *testing.T) {
+func TestBasicSpliceQuoted(t *testing.T) {
 	d := t.TempDir()
 	writeFile(t, d, "service-values.yaml", "svc:\n  a: 1\n  b:\n    c: d\n")
-	writeFile(t, d, "values.yaml", "service: service-values.yaml\n")
+	writeFile(t, d, "values.yaml", "service: \"[[ service-values.yaml ]]\"\n")
 
 	out, err := splice.ResolveFileToYAML(filepath.Join(d, "values.yaml"), splice.Options{})
 	if err != nil {
@@ -50,7 +50,6 @@ func TestBasicSplice(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected service to be mapping, got %T", m["service"])
 	}
-	// resolved document has top-level key "svc" per the test fixture
 	svc, ok := service["svc"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("expected service.svc to be mapping, got %T", service["svc"])
@@ -60,10 +59,30 @@ func TestBasicSplice(t *testing.T) {
 	}
 }
 
+func TestBasicSpliceUnquotedFlowSequence(t *testing.T) {
+	d := t.TempDir()
+	writeFile(t, d, "service-values.yaml", "svc:\n  a: 1\n")
+	// Test unquoted [[ file.yaml ]], which yaml.v3 parses as a nested SequenceNode
+	writeFile(t, d, "values.yaml", "service: [[ service-values.yaml ]]\n")
+
+	out, err := splice.ResolveFileToYAML(filepath.Join(d, "values.yaml"), splice.Options{})
+	if err != nil {
+		t.Fatalf("ResolveFileToYAML: %v", err)
+	}
+
+	v := unmarshalYAML(t, out)
+	m := v.(map[string]interface{})
+	service := m["service"].(map[string]interface{})
+	svc := service["svc"].(map[string]interface{})
+	if fmtSprint(svc["a"]) != "1" {
+		t.Fatalf("unexpected service.svc.a: %#v", svc["a"])
+	}
+}
+
 func TestEnvSubstitution(t *testing.T) {
 	d := t.TempDir()
 	writeFile(t, d, "service-values-prod.yaml", "deployment:\n  replicas: 3\n")
-	writeFile(t, d, "values.yaml", "service: service-values-{{ env }}.yaml\n")
+	writeFile(t, d, "values.yaml", "service: \"[[ service-values-{{ env }}.yaml ]]\"\n")
 
 	out, err := splice.ResolveFileToYAML(filepath.Join(d, "values.yaml"), splice.Options{Env: "prod"})
 	if err != nil {
@@ -73,17 +92,29 @@ func TestEnvSubstitution(t *testing.T) {
 	v := unmarshalYAML(t, out)
 	m := v.(map[string]interface{})
 	svc := m["service"].(map[string]interface{})
-	// resolved doc has top-level "deployment"
 	deployment := svc["deployment"].(map[string]interface{})
 	if fmtSprint(deployment["replicas"]) != "3" {
 		t.Fatalf("expected replicas=3, got %#v", deployment["replicas"])
 	}
 }
 
+func TestEnvSubstitutionMissing(t *testing.T) {
+	d := t.TempDir()
+	writeFile(t, d, "values.yaml", "service: \"[[ service-values-{{ env }}.yaml ]]\"\n")
+
+	_, err := splice.ResolveFileToYAML(filepath.Join(d, "values.yaml"), splice.Options{})
+	if err == nil {
+		t.Fatalf("expected error for missing env option, got nil")
+	}
+	if !strings.Contains(err.Error(), "requires --env") {
+		t.Fatalf("expected missing env error, got: %v", err)
+	}
+}
+
 func TestCircularReference(t *testing.T) {
 	d := t.TempDir()
-	writeFile(t, d, "a.yaml", "b: b.yaml\n")
-	writeFile(t, d, "b.yaml", "a: a.yaml\n")
+	writeFile(t, d, "a.yaml", "b: \"[[ b.yaml ]]\"\n")
+	writeFile(t, d, "b.yaml", "a: \"[[ a.yaml ]]\"\n")
 
 	_, err := splice.ResolveFileToYAML(filepath.Join(d, "a.yaml"), splice.Options{})
 	if err == nil {
@@ -97,7 +128,7 @@ func TestCircularReference(t *testing.T) {
 func TestEmptyReferencedFile(t *testing.T) {
 	d := t.TempDir()
 	writeFile(t, d, "empty.yaml", "")
-	writeFile(t, d, "values.yaml", "ref: empty.yaml\n")
+	writeFile(t, d, "values.yaml", "ref: \"[[ empty.yaml ]]\"\n")
 
 	_, err := splice.ResolveFileToYAML(filepath.Join(d, "values.yaml"), splice.Options{})
 	if err == nil {
@@ -126,9 +157,7 @@ func TestNonMappingTopLevel(t *testing.T) {
 	}
 }
 
-// fmtSprint produces a YAML-like string for simple values to facilitate assertions
 func fmtSprint(v interface{}) string {
-	// Use yaml.Marshal to produce a normalized textual representation
 	b, _ := yaml.Marshal(v)
 	return strings.TrimSpace(string(b))
 }
