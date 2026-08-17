@@ -1,0 +1,8 @@
+name: "splice"
+version: "0.1.0"
+usage: "resolve [[ file.yaml ]] references before running helm"
+description: "Injects external values.yaml file contents into templates"
+command: "$HELM_PLUGIN_DIR/bin/helm-splice"
+hooks:
+  install: "$HELM_PLUGIN_DIR/scripts/install-binary.sh"
+  update: "$HELM_PLUGIN_DIR/scripts/install-binary.sh" 
