@@ -1,12 +1,33 @@
+apiVersion: "v1"
 name: "splice"
 version: "0.1.0"
-usage: "Splicing values files using inline placeholders"
-description: "Helm downloader plugin to recursively splice values files"
-downloaders:
-  - command: "helm-splice"
-    protocols:
-      - "splice"
-
-hooks:
-  install: "scripts/install-binary.sh"
-  update: "scripts/install-binary.sh"
+type: "getter/v1"
+runtime: subprocess
+config:
+  protocols:
+    - "splice"
+runtimeConfig:
+  protocolCommands:
+    - protocols:
+        - "splice"
+      platformCommand:
+        - command: "helm-splice"
+  platformHooks:
+    install:
+      - os: linux
+        arch: ""
+        command: "bash"
+        args: ["-c", "${HELM_PLUGIN_DIR}/scripts/install-binary.sh"]
+      - os: darwin
+        arch: ""
+        command: "bash"
+        args: ["-c", "${HELM_PLUGIN_DIR}/scripts/install-binary.sh"]
+    update:
+      - os: linux
+        arch: ""
+        command: "bash"
+        args: ["-c", "${HELM_PLUGIN_DIR}/scripts/install-binary.sh"]
+      - os: darwin
+        arch: ""
+        command: "bash"
+        args: ["-c", "${HELM_PLUGIN_DIR}/scripts/install-binary.sh"]
