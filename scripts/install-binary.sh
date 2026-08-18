@@ -10,8 +10,8 @@ mkdir -p "$HELM_PLUGIN_DIR/bin"
 
 echo "Building helm-splice..."
 # Build the plugin binary into the plugin's bin/ directory
-GOOS=${GOOS:-$(uname | tr '[:upper:]' '[:lower:]')} \
-GOARCH=${GOARCH:-amd64} \
+GOOS=${GOOS:-$(go env GOOS)} \
+GOARCH=${GOARCH:-$(go env GOARCH)} \
   go build -o "$HELM_PLUGIN_DIR/bin/helm-splice" ./cmd/helm-splice
 
 echo "Installed $HELM_PLUGIN_DIR/bin/helm-splice"

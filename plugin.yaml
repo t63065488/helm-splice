@@ -6,3 +6,7 @@ downloaders:
   - command: "helm-splice"
     protocols:
       - "splice"
+
+hooks:
+  install: "scripts/install-binary.sh"
+  update: "scripts/install-binary.sh"
